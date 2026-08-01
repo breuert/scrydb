@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrydb"
+version = "0.1.0"
+description = "Lexical, semantic, and hybrid search built on SQLite."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Timo Breuer", email = "timobreuer@acm.org" },
+]
+keywords = ["sqlite", "fts5", "information-retrieval", "search", "embeddings"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Topic :: Text Processing :: Indexing",
+    "Topic :: Database",
+]
+dependencies = [
+    "numpy>=1.22",
+    "tqdm>=4.60",
+]
+
+[project.optional-dependencies]
+dense = ["sentence-transformers>=3.0"]
+eval = ["pandas>=1.5"]
+all = ["sentence-transformers>=3.0", "pandas>=1.5"]
+
+[project.urls]
+Homepage = "https://breuert.github.io/scrydb"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"scrydb.ext" = ["hamming.c", "hamming.so", "hamming.dylib"]
