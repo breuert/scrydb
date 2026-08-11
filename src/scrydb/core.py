@@ -97,11 +97,15 @@ def _bundled_hamming_path() -> "Path | None":
 # natural-language question — is not valid FTS5 syntax and raises
 # sqlite3.OperationalError. Replaced with a space so words on either side
 # don't get glued together.
-_FTS5_SPECIAL_CHARS_RE = re.compile(r'["(){}\[\]:^*?~\'\.\/\-\,&]')
+_FTS5_SPECIAL_CHARS_RE = re.compile(r'["(){}\[\]:^*?~\'\.\/\-\,&!;%#$=@+<>|`]')
 
 
 def _sanitize(text: str) -> str:
-    cleaned = _FTS5_SPECIAL_CHARS_RE.sub(" ", text)
+    # FTS5's AND/OR/NOT/NEAR operators are only recognized in upper case;
+    # lower-casing first means a stray "AND" etc. in the input is treated
+    # as an ordinary search term instead of a boolean operator. The default
+    # FTS5 tokenizers are case-insensitive, so this doesn't change matching.
+    cleaned = _FTS5_SPECIAL_CHARS_RE.sub(" ", text.lower())
     return " ".join(cleaned.split())
 
 
