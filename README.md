@@ -1,9 +1,17 @@
-# scrydb
+<p align="center">
+    <img src="./docs/images/logo-light.png" width=250/>
+    <h1 align="center">scrydb</h1>
+</p>
 
-Lexical, semantic, and hybrid search built on SQLite: lexical (BM25),
-dense (embedding), and hybrid search, with a pluggable retrieval-model
-interface.
+``scrydb`` is built for one purpose: making lexical, dense, and hybrid search possible with [SQLite](https://sqlite.org/). It follows a minimalist's approach where hardware requirements are kept low and everything is self-contained in a single file, i.e., the raw documents, their embeddings, and the lexical index are stored in a single SQLite file.
 
+Technically, lexical search is made possible by the [FTS5 extension for SQLite](https://sqlite.org/fts5.html). Semantic search for the entire index is made possible with binary embeddings and the [Hamming distance](https://en.wikipedia.org/wiki/Hamming_distance) that is implemented with the help of an efficient [custom SQLite extension](./src/scrydb/ext/hamming.c). Optionally, the retrieved results can be reranked with the full embeddings and cosine similarity or the full embeddings can be discarded entirely to keep the disk usage low. Hybrid search relies on [Reciprocal Rank Fusion](https://dl.acm.org/doi/10.1145/1571941.1572114) to fuse lexical and semantic search results. 
+
+The library is compatible with [Sentence Transformers](https://www.sbert.net/index.html). However, it is also possible to store precomputed embeddings for both queries and documents.
+
+## Usage examples
+
+``scrydb`` can be used interactively as follows:
 ```python
 from scrydb import Index, SentenceEmbedding
 
@@ -13,11 +21,35 @@ with Index.open("idx.db") as index:
     results = index.search("some query", mode="hybrid", rerank=True)
 ```
 
-## Platform support
+Batch search for Information Retrieval benchmarks with precomputed embeddings can be run as follows:
+```python
+import scrydb
 
-Linux and macOS only (see "Why source-only" below for Windows).
+idx = scrydb.Index.open("./path/to/index.db")
+
+idx.index_documents(
+    source="./path/to/corpus.jsonl",
+    id_field="docid",
+    text_field="text",
+    embedding_field="embedding"
+    )
+
+idx.index_queries(
+    source="./path/to/queries.jsonl",
+    id_field="qid",
+    text_field="text",
+    embedding_field="embedding"
+    )
+
+idx.batch_search(mode="lexical").write_trec("./path/to/lexical/run")
+idx.batch_search(mode="semantic").write_trec("./path/to/semantic/run")
+idx.batch_search(mode="hybrid").write_trec("./path/to/hybrid/run")
+```
 
 ## Installing
+
+> [!NOTE]  
+> **Platform support:** Linux and macOS only (see "Why source-only" below for Windows).
 
 ```bash
 pip install scrydb
@@ -25,7 +57,7 @@ pip install scrydb
 
 This package includes a native SQLite loadable extension
 (`hamming_distance()`, used for fast binary/hex vector search) written in
-C (`src/scrydb/ext/hamming.c`). **A C compiler and the SQLite development
+C ([`src/scrydb/ext/hamming.c`](./src/scrydb/ext/hamming.c)). **A C compiler and the SQLite development
 headers must be available on your machine at install time** — pip builds
 the extension for your exact platform as part of the install:
 
