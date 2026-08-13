@@ -3,7 +3,7 @@
     <h1 align="center">scrydb</h1>
 </p>
 
-``scrydb``'s purpose is making lexical, dense, and hybrid search possible with [SQLite](https://sqlite.org/). It follows a minimalist's approach where hardware requirements are kept low and everything is self-contained in a single file, i.e., the raw documents, their embeddings, and the lexical index are stored in a single SQLite file.
+``scrydb``'s purpose is making lexical, dense, and hybrid search possible with [SQLite](https://sqlite.org/) by following a minimalist approach. Hardware requirements are kept low and everything is self-contained in a single file, i.e., the raw documents, their embeddings, and the lexical index are stored in a single SQLite file.
 
 - Lexical search is made possible by the [FTS5 extension for SQLite](https://sqlite.org/fts5.html). 
 - Semantic search for the entire index is made possible with binary embeddings and the [Hamming distance](https://en.wikipedia.org/wiki/Hamming_distance) that is implemented with the help of an efficient [custom SQLite extension](./src/scrydb/ext/hamming.c). 
