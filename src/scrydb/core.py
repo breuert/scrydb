@@ -11,6 +11,10 @@ Public surface
     index.search(query, mode=...)         -- one query in, ranked list out
     index.batch_search(queries=..., mode=...)  -- many queries -> Run
     index.documents[id] / index.queries[id]    -- mapping-style lookups
+    index.document_embeddings[id] / index.query_embeddings[id]
+                                           -- mapping-style embedding lookups
+                                              (``_binary`` variants for the
+                                              ubinary-quantized vectors)
     run.write_trec(path, tag=...)         -- TREC run file
     run.to_dataframe()                    -- pandas, for analysis/eval
 
@@ -322,6 +326,40 @@ class _PayloadTable(Mapping):
         return f"<{self._table}: {len(self)} items>"
 
 
+class _EmbeddingTable(Mapping):
+    """Read-only ``{id: np.ndarray}`` view over an ``(id, embedding)`` table.
+
+    *dtype* is ``np.uint8`` for ``ubinary``-quantized tables (``embeddings``
+    / ``query_embeddings``) and ``np.float32`` for full-precision tables
+    (``embeddings_full`` / ``query_embeddings_full``).
+    """
+
+    def __init__(self, conn: sqlite3.Connection, table: str, dtype: "np.dtype"):
+        self._conn = conn
+        self._table = table
+        self._dtype = dtype
+
+    def __getitem__(self, item_id: str) -> np.ndarray:
+        cur = self._conn.execute(
+            f"SELECT embedding FROM {self._table} WHERE id = ?", (str(item_id),)
+        )
+        row = cur.fetchone()
+        if row is None:
+            raise KeyError(item_id)
+        return np.frombuffer(row[0], dtype=self._dtype)
+
+    def __iter__(self) -> Iterator[str]:
+        cur = self._conn.execute(f"SELECT id FROM {self._table}")
+        for (item_id,) in cur:
+            yield item_id
+
+    def __len__(self) -> int:
+        return self._conn.execute(f"SELECT COUNT(*) FROM {self._table}").fetchone()[0]
+
+    def __repr__(self) -> str:
+        return f"<{self._table}: {len(self)} items>"
+
+
 # ===========================================================================
 # Source normalization — accept a path or any iterable of dict-like rows,
 # so the caller never has to name a storage format.
@@ -428,6 +466,30 @@ class Index:
     def queries(self) -> _PayloadTable:
         """Read-only mapping ``{query_id: query_dict}``."""
         return _PayloadTable(self.conn, "queries")
+
+    @property
+    def document_embeddings(self) -> _EmbeddingTable:
+        """Read-only mapping ``{doc_id: float32 ndarray}`` of full-precision
+        document embeddings (requires ``store_full_embeddings=True``)."""
+        return _EmbeddingTable(self.conn, "embeddings_full", np.float32)
+
+    @property
+    def document_embeddings_binary(self) -> _EmbeddingTable:
+        """Read-only mapping ``{doc_id: uint8 ndarray}`` of ``ubinary``-
+        quantized document embeddings."""
+        return _EmbeddingTable(self.conn, "embeddings", np.uint8)
+
+    @property
+    def query_embeddings(self) -> _EmbeddingTable:
+        """Read-only mapping ``{query_id: float32 ndarray}`` of full-precision
+        query embeddings (requires ``store_full_embeddings=True``)."""
+        return _EmbeddingTable(self.conn, "query_embeddings_full", np.float32)
+
+    @property
+    def query_embeddings_binary(self) -> _EmbeddingTable:
+        """Read-only mapping ``{query_id: uint8 ndarray}`` of ``ubinary``-
+        quantized query embeddings."""
+        return _EmbeddingTable(self.conn, "query_embeddings", np.uint8)
 
     # -- indexing ----------------------------------------------------------
 
