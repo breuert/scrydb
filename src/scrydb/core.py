@@ -189,12 +189,21 @@ class Run(dict):
 
     # Recognized score fields, in priority order, and whether a *lower*
     # value means *better* (so it must be negated to become higher-is-better
-    # for the TREC SCORE column).
+    # for the TREC SCORE column). Rerank fields (cosine_similarity,
+    # hamming_distance) must outrank the plain lexical "score": _rerank()
+    # merges a reranked result's fields on top of its base-stage fields
+    # (``{**base_extra, "hamming_distance": dist}``), so a BM25 → rerank
+    # result still carries its original lexical "score" alongside the new
+    # rerank field. Most eval tools (trec_eval, pytrec_eval, ir_measures,
+    # ...) rank purely by the written SCORE column and ignore row/rank
+    # order, so picking the stale "score" here would silently drop the
+    # rerank stage from evaluation while still *looking* reranked in the
+    # RANK column.
     _SCORE_FIELDS = (
         ("rrf_score", False),
-        ("score", False),
         ("cosine_similarity", False),
         ("hamming_distance", True),
+        ("score", False),
     )
 
     def write_trec(
