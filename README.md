@@ -3,9 +3,11 @@
     <h1 align="center">scrydb</h1>
 </p>
 
-``scrydb`` is built for one purpose: making lexical, dense, and hybrid search possible with [SQLite](https://sqlite.org/). It follows a minimalist's approach where hardware requirements are kept low and everything is self-contained in a single file, i.e., the raw documents, their embeddings, and the lexical index are stored in a single SQLite file.
+``scrydb``'s purpose is making lexical, dense, and hybrid search possible with [SQLite](https://sqlite.org/). It follows a minimalist's approach where hardware requirements are kept low and everything is self-contained in a single file, i.e., the raw documents, their embeddings, and the lexical index are stored in a single SQLite file.
 
-Technically, lexical search is made possible by the [FTS5 extension for SQLite](https://sqlite.org/fts5.html). Semantic search for the entire index is made possible with binary embeddings and the [Hamming distance](https://en.wikipedia.org/wiki/Hamming_distance) that is implemented with the help of an efficient [custom SQLite extension](./src/scrydb/ext/hamming.c). Optionally, the retrieved results can be reranked with the full embeddings and cosine similarity or the full embeddings can be discarded entirely to keep the disk usage low. Hybrid search relies on [Reciprocal Rank Fusion](https://dl.acm.org/doi/10.1145/1571941.1572114) to fuse lexical and semantic search results. 
+- Lexical search is made possible by the [FTS5 extension for SQLite](https://sqlite.org/fts5.html). 
+- Semantic search for the entire index is made possible with binary embeddings and the [Hamming distance](https://en.wikipedia.org/wiki/Hamming_distance) that is implemented with the help of an efficient [custom SQLite extension](./src/scrydb/ext/hamming.c). Optionally, the retrieved results can be reranked with the full embeddings and cosine similarity or the full embeddings can be discarded entirely to keep the disk usage low. 
+- Hybrid search relies on [Reciprocal Rank Fusion](https://dl.acm.org/doi/10.1145/1571941.1572114) to fuse lexical and semantic search results. 
 
 The library is compatible with [Sentence Transformers](https://www.sbert.net/index.html). However, it is also possible to store precomputed embeddings for both queries and documents.
 
