@@ -57,6 +57,14 @@ idx.batch_search(mode="hybrid").write_trec("./path/to/hybrid/run")
 pip install scrydb
 ```
 
+Or with [uv](https://docs.astral.sh/uv/) (faster, and manages the virtualenv for you):
+
+```bash
+uv venv && uv pip install scrydb
+# or, inside a uv-managed project:
+uv add scrydb
+```
+
 This package includes a native SQLite loadable extension
 (`hamming_distance()`, used for fast binary/hex vector search) written in
 C ([`src/scrydb/ext/hamming.c`](./src/scrydb/ext/hamming.c)). **A C compiler and the SQLite development
@@ -102,6 +110,85 @@ explicitly:
 Index.open("idx.db", hamming_ext_path=None)
 ```
 
+### Try the CLI without installing (uvx)
+
+[`uvx`](https://docs.astral.sh/uv/guides/tools/) runs the `scrydb` command-line
+tool (`index`/`search`/`batch-search`/`auto` — see the [Docker](#docker)
+section below for the full reference) in a throwaway environment, no venv or
+persistent install needed:
+
+```bash
+uvx scrydb index --documents corpus.jsonl --queries queries.jsonl --db idx.db
+uvx scrydb search "some query" --db idx.db --mode hybrid --rerank cosine
+uvx scrydb batch-search --db idx.db --mode hybrid --output run.trec
+```
+
+The same compiler/SQLite-headers prerequisite above still applies — `uvx`
+still has to build the native extension the first time it installs scrydb
+into its cache, it just skips the "make a venv" step. If you'd rather skip
+the compiler prerequisite entirely, use [Docker](#docker) instead, which
+builds the extension once inside the image.
+
+## Docker
+
+No local Python/compiler install needed: the [`Dockerfile`](./Dockerfile) builds a
+Linux image with scrydb (and its native `hamming_distance()` extension)
+already compiled in, driven by a bundled `scrydb` CLI. Everything it reads
+and writes -- input JSONL, the SQLite index, TREC run files -- lives under
+`/data`, so bind-mount a host directory there.
+
+```bash
+docker build -t scrydb .
+```
+
+Drop `documents.jsonl` (and, optionally, `queries.jsonl`) into `./data` and
+run the image with no arguments: it indexes whatever's present into
+`./data/index.db`, then either batch-searches the stored queries into
+`./data/run.trec` or -- if there's nothing to index and no stored queries --
+tells you what it's waiting for.
+
+```bash
+docker run --rm -v "$PWD/data":/data scrydb
+```
+
+If `./data/index.db` already exists (say, you built it locally, or a
+previous run produced it), the same command re-uses it: skips indexing
+whatever source files aren't present and searches straight away. To query
+an existing index ad hoc instead of running a full batch, override the
+default command:
+
+```bash
+docker run --rm -v "$PWD/data":/data scrydb search "some query" --mode hybrid --rerank cosine
+```
+
+Every option is also settable as an `SCRYDB_*` environment variable (handy
+for `docker run -e`), and the JSONL id-field names for documents/queries
+default to `docid`/`qid`-style overrides when they differ from `id`:
+
+```bash
+docker run --rm -v "$PWD/data":/data \
+  -e SCRYDB_DOC_ID_FIELD=docid -e SCRYDB_QUERY_ID_FIELD=qid \
+  -e SCRYDB_MODEL=mixedbread-ai/mxbai-embed-large-v1 \
+  -e SCRYDB_MODE=hybrid -e SCRYDB_RERANK=cosine \
+  scrydb
+```
+
+Run `docker run --rm scrydb --help` (or `... <subcommand> --help`) for the
+full `index`/`search`/`batch-search`/`auto` reference, or see the
+module docstring in [`src/scrydb/cli.py`](./src/scrydb/cli.py).
+
+Notes:
+
+- **Dense/hybrid search** (`sentence-transformers`) isn't in the image by
+  default -- build with `--build-arg EXTRAS=all` (or `dense`) to add it.
+  This installs the CPU-only `torch` build so the image doesn't pull in
+  multi-gigabyte CUDA packages it can't use.
+- **Multi-platform**: build once for both Intel/AMD and Apple
+  Silicon/ARM hosts (each running natively, no QEMU emulation) with
+  `docker buildx build --platform linux/amd64,linux/arm64 -t scrydb .`
+- **Plain Python access**: `docker run --rm -it -v "$PWD/data":/data --entrypoint python3 scrydb`
+  drops into an interpreter with `scrydb` importable.
+
 ### Why source-only (no prebuilt wheels)
 
 `hamming.so`/`hamming.dylib` is a native shared library, and its ABI
@@ -137,8 +224,22 @@ pip install -e ".[all]"
 pytest
 ```
 
+Or with uv:
+
+```bash
+git clone <repo>
+cd scrydb
+uv venv
+uv pip install -e ".[all]"
+uv run pytest
+```
+
+`uv run` picks up `.venv` automatically, so there's no `source .venv/bin/activate`
+step — any command after it (`uv run pytest`, `uv run python -m scrydb.cli --help`,
+`uv run python your_script.py`) runs inside the project's venv.
+
 ## Optional extras
 
-- `pip install "scrydb[dense]"` — dense/hybrid search via `sentence-transformers`
-- `pip install "scrydb[eval]"` — `Run.to_dataframe()` via `pandas`
-- `pip install "scrydb[all]"` — both
+- `pip install "scrydb[dense]"` / `uv pip install "scrydb[dense]"` — dense/hybrid search via `sentence-transformers`
+- `pip install "scrydb[eval]"` / `uv pip install "scrydb[eval]"` — `Run.to_dataframe()` via `pandas`
+- `pip install "scrydb[all]"` / `uv pip install "scrydb[all]"` — both
