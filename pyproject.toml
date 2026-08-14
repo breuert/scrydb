@@ -34,6 +34,9 @@ all = ["sentence-transformers>=3.0", "pandas>=1.5"]
 [project.urls]
 Homepage = "https://breuert.github.io/scrydb"
 
+[project.scripts]
+scrydb = "scrydb.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
