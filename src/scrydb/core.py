@@ -638,6 +638,8 @@ class Index:
         candidate_limit: int = 50,
         rrf_k: int = 60,
         raw: bool = False,
+        bm25_b: float = 0.6,
+        bm25_k1: float = 0.9,
     ) -> list[SearchResult]:
         """Run one query, return a ranked list of :class:`SearchResult`.
 
@@ -665,11 +667,14 @@ class Index:
             themselves). If ``False`` (default), it is sanitized and its
             terms OR-joined, which is safe for arbitrary natural-language
             input (e.g. a trailing "?" no longer raises a syntax error).
+        bm25_b, bm25_k1:
+            BM25 parameters passed through to FTS5's ``bm25()``, used
+            whenever ``mode`` is ``"lexical"`` or ``"hybrid"``.
         """
         rerank_with = self._normalize_rerank(rerank)
         if mode == "lexical":
             base_limit = rerank_depth if rerank_with else top_k
-            ranked = self._lexical_rank(query, limit=base_limit, raw=raw)
+            ranked = self._lexical_rank(query, limit=base_limit, b=bm25_b, k1=bm25_k1, raw=raw)
             if rerank_with:
                 ranked = self._rerank(ranked, rerank_with, limit=top_k, query_text=query)
         elif mode == "semantic":
@@ -677,7 +682,7 @@ class Index:
                 query_text=query, limit=top_k, rerank=rerank_with, rerank_depth=rerank_depth
             )
         elif mode == "hybrid":
-            lexical = self._lexical_rank(query, limit=candidate_limit)
+            lexical = self._lexical_rank(query, limit=candidate_limit, b=bm25_b, k1=bm25_k1)
             semantic = self._semantic_rank(
                 query_text=query, limit=candidate_limit, rerank=rerank_with, rerank_depth=rerank_depth
             )
@@ -698,11 +703,14 @@ class Index:
         candidate_limit: int = 50,
         rrf_k: int = 60,
         raw: bool = False,
+        bm25_b: float = 0.6,
+        bm25_k1: float = 0.9,
     ) -> Run:
         """Run many stored queries, return a :class:`Run`.
 
-        Same ``mode``/``rerank``/``raw`` vocabulary as :meth:`search`, but
-        driven by stored query ids instead of a literal query string.
+        Same ``mode``/``rerank``/``raw``/``bm25_b``/``bm25_k1`` vocabulary
+        as :meth:`search`, but driven by stored query ids instead of a
+        literal query string.
 
         Parameters
         ----------
@@ -728,7 +736,7 @@ class Index:
                 if query_text is None:
                     raise ValueError(f"Query {query_id!r} has no stored 'text'; required for mode='lexical'.")
                 base_limit = rerank_depth if rerank_with else top_k
-                ranked = self._lexical_rank(query_text, limit=base_limit, raw=raw)
+                ranked = self._lexical_rank(query_text, limit=base_limit, b=bm25_b, k1=bm25_k1, raw=raw)
                 if rerank_with:
                     ranked = self._rerank(
                         ranked, rerank_with, limit=top_k, query_text=query_text, query_id=query_id
@@ -746,7 +754,7 @@ class Index:
                     raise ValueError(
                         f"Query {query_id!r} has no stored 'text'; required for mode='hybrid' (lexical stage)."
                     )
-                lexical = self._lexical_rank(query_text, limit=candidate_limit)
+                lexical = self._lexical_rank(query_text, limit=candidate_limit, b=bm25_b, k1=bm25_k1)
                 semantic = self._semantic_rank(
                     query_text=query_text,
                     query_id=query_id,
