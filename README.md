@@ -3,11 +3,11 @@
     <h1 align="center">scrydb</h1>
 </p>
 
-``scrydb``'s purpose is making lexical, dense, and hybrid search possible with [SQLite](https://sqlite.org/) by following a minimalist approach. Hardware requirements are kept low and everything is self-contained in a single file, i.e., the raw documents, their embeddings, and the lexical index are stored in a single SQLite file.
+``scrydb``'s purpose is making lexical, dense, and hybrid search possible with [SQLite](https://sqlite.org/). Hardware requirements are kept low and everything is self-contained in a single file, i.e., the raw documents, their embeddings, and the lexical index are stored in a single SQLite file.
 
-- Lexical search is made possible by the [FTS5 extension for SQLite](https://sqlite.org/fts5.html). 
-- Semantic search for the entire index is made possible with binary embeddings and the [Hamming distance](https://en.wikipedia.org/wiki/Hamming_distance) that is implemented with the help of an efficient [custom SQLite extension](./src/scrydb/ext/hamming.c). 
-- Hybrid search relies on [Reciprocal Rank Fusion](https://dl.acm.org/doi/10.1145/1571941.1572114) to fuse lexical and semantic search results. 
+- Lexical search is made possible by the [FTS5 extension for SQLite](https://sqlite.org/fts5.html).
+- Semantic search over the entire index is made possible by [`sqlite-vec`](https://github.com/asg017/sqlite-vec), a small, dependency-free vector search extension for SQLite. Every embedding can be searched at three precisions: **binary** (1 bit/dim, Hamming distance), **int8** (1 byte/dim, cosine), and **float** (full precision, cosine) — trading index size and speed against ranking quality, and combinable as a two-stage rerank (e.g. binary-first >> float-precision rerank).
+- Hybrid search relies on [Reciprocal Rank Fusion](https://dl.acm.org/doi/10.1145/1571941.1572114) to fuse lexical and semantic search results.
 
 The library is compatible with [Sentence Transformers](https://www.sbert.net/index.html). However, it is also possible to store precomputed embeddings for both queries and documents.
 
@@ -33,25 +33,44 @@ idx.index_documents(
     source="./path/to/corpus.jsonl",
     id_field="docid",
     text_field="text",
-    embedding_field="embedding"
+    embedding_field="embedding",
+    store_int8_embeddings=True,  # opt in to int8 storage alongside binary/float
     )
 
 idx.index_queries(
     source="./path/to/queries.jsonl",
     id_field="qid",
     text_field="text",
-    embedding_field="embedding"
+    embedding_field="embedding",
+    store_int8_embeddings=True,
     )
 
 idx.batch_search(mode="lexical").write_trec("./path/to/lexical/run")
-idx.batch_search(mode="semantic").write_trec("./path/to/semantic/run")
+idx.batch_search(mode="semantic", precision="binary").write_trec("./path/to/binary/run")
+idx.batch_search(mode="semantic", precision="int8").write_trec("./path/to/int8/run")
+idx.batch_search(mode="semantic", precision="float").write_trec("./path/to/float/run")
+idx.batch_search(mode="semantic", precision="binary", rerank="float").write_trec("./path/to/binary-rerank-float/run")
 idx.batch_search(mode="hybrid").write_trec("./path/to/hybrid/run")
 ```
 
-## Installing
+### Search modes, precision, and rerank
 
-> [!NOTE]  
-> **Platform support:** Linux and macOS only (see "Why source-only" below for Windows).
+`search()`/`batch_search()` take three orthogonal knobs:
+
+- `mode` — `"lexical"` (BM25 over FTS5), `"semantic"` (vector search), or `"hybrid"` (Reciprocal Rank Fusion of both).
+- `precision` — which vector representation `mode="semantic"`/the semantic side of `mode="hybrid"` ranks with: `"binary"` (default), `"int8"`, or `"float"`.
+- `rerank` — `False` (default), or a second-stage rerank over the top candidates from `mode`, at `"binary"`, `"int8"`, or `"float"` precision (`True` is a synonym for `"float"`).
+
+```python
+idx.search("some query", mode="lexical")                                         # BM25
+idx.search("some query", mode="lexical", rerank="float")                         # BM25 >> Float/Cosine
+idx.search("some query", mode="semantic", precision="binary")                    # Binary/Hamming
+idx.search("some query", mode="semantic", precision="int8")                      # Int8/Cosine
+idx.search("some query", mode="semantic", precision="binary", rerank="float")    # Binary >> Float/Cosine
+idx.search("some query", mode="hybrid", rerank=True)                             # Hybrid/RRF
+```
+
+## Installing
 
 ```bash
 pip install scrydb
@@ -65,49 +84,27 @@ uv venv && uv pip install scrydb
 uv add scrydb
 ```
 
-This package includes a native SQLite loadable extension
-(`hamming_distance()`, used for fast binary/hex vector search) written in
-C ([`src/scrydb/ext/hamming.c`](./src/scrydb/ext/hamming.c)). **A C compiler and the SQLite development
-headers must be available on your machine at install time** — pip builds
-the extension for your exact platform as part of the install:
+No C compiler or SQLite development headers required: vector search is
+powered by [`sqlite-vec`](https://github.com/asg017/sqlite-vec), a pure
+pip dependency that ships prebuilt binaries, so `pip install scrydb` is a
+plain, fast, wheel-only install.
 
-- **macOS**: install the Xcode Command Line Tools once, if you haven't
-  already:
+`Index.open()` loads the `sqlite-vec` extension automatically. This
+requires a Python build whose `sqlite3` module supports
+`enable_load_extension()` — true for the vast majority of Python
+installs (Homebrew/pyenv/python.org on macOS, virtually all Linux distro
+packages), but **not** macOS's system Python, which links against
+Apple's SQLite with extension loading disabled. If you hit a
+`RuntimeError` mentioning `enable_load_extension`, install Python via
+Homebrew (`brew install python`) or pyenv
+(`PYTHON_CONFIGURE_OPTS='--enable-loadable-sqlite-extensions' pyenv
+install <version>`) instead.
 
-  ```bash
-  xcode-select --install
-  ```
-
-  (macOS ships `sqlite3ext.h` alongside the system SQLite headers, so no
-  separate SQLite package is required.)
-
-- **Debian/Ubuntu**:
-
-  ```bash
-  sudo apt-get install build-essential libsqlite3-dev
-  ```
-
-- **Fedora/RHEL**:
-
-  ```bash
-  sudo dnf install gcc sqlite-devel
-  ```
-
-- **Arch**:
-
-  ```bash
-  sudo pacman -S base-devel sqlite
-  ```
-
-If the compiler or headers are missing, `pip install scrydb` fails with a
-message explaining exactly what to install (see `setup.py`).
-
-If you'd rather not compile anything, you can still install and use scrydb
-for lexical (BM25) and cosine-rerank search — just disable the extension
-explicitly:
+If you'd rather not load the extension at all, you can still install and
+use scrydb for lexical (BM25) search only — just disable it explicitly:
 
 ```python
-Index.open("idx.db", hamming_ext_path=None)
+Index.open("idx.db", vec_ext_path=None)
 ```
 
 ### Try the CLI without installing (uvx)
@@ -119,23 +116,20 @@ persistent install needed:
 
 ```bash
 uvx scrydb index --documents corpus.jsonl --queries queries.jsonl --db idx.db
-uvx scrydb search "some query" --db idx.db --mode hybrid --rerank cosine
+uvx scrydb search "some query" --db idx.db --mode hybrid --rerank float
 uvx scrydb batch-search --db idx.db --mode hybrid --output run.trec
 ```
 
-The same compiler/SQLite-headers prerequisite above still applies — `uvx`
-still has to build the native extension the first time it installs scrydb
-into its cache, it just skips the "make a venv" step. If you'd rather skip
-the compiler prerequisite entirely, use [Docker](#docker) instead, which
-builds the extension once inside the image.
+Since scrydb has no compiled artifacts of its own, `uvx` just downloads the
+wheel and its dependencies (including `sqlite-vec`'s prebuilt binary) into
+its cache — no build step at all.
 
 ## Docker
 
-No local Python/compiler install needed: the [`Dockerfile`](./Dockerfile) builds a
-Linux image with scrydb (and its native `hamming_distance()` extension)
-already compiled in, driven by a bundled `scrydb` CLI. Everything it reads
-and writes -- input JSONL, the SQLite index, TREC run files -- lives under
-`/data`, so bind-mount a host directory there.
+No local Python install needed: the [`Dockerfile`](./Dockerfile) builds a
+Linux image with scrydb already installed, driven by a bundled `scrydb`
+CLI. Everything it reads and writes -- input JSONL, the SQLite index, TREC
+run files -- lives under `/data`, so bind-mount a host directory there.
 
 ```bash
 docker build -t scrydb .
@@ -158,7 +152,7 @@ an existing index ad hoc instead of running a full batch, override the
 default command:
 
 ```bash
-docker run --rm -v "$PWD/data":/data scrydb search "some query" --mode hybrid --rerank cosine
+docker run --rm -v "$PWD/data":/data scrydb search "some query" --mode hybrid --rerank float
 ```
 
 Every option is also settable as an `SCRYDB_*` environment variable (handy
@@ -169,7 +163,7 @@ default to `docid`/`qid`-style overrides when they differ from `id`:
 docker run --rm -v "$PWD/data":/data \
   -e SCRYDB_DOC_ID_FIELD=docid -e SCRYDB_QUERY_ID_FIELD=qid \
   -e SCRYDB_MODEL=mixedbread-ai/mxbai-embed-large-v1 \
-  -e SCRYDB_MODE=hybrid -e SCRYDB_RERANK=cosine \
+  -e SCRYDB_MODE=hybrid -e SCRYDB_RERANK=float \
   scrydb
 ```
 
@@ -189,30 +183,13 @@ Notes:
 - **Plain Python access**: `docker run --rm -it -v "$PWD/data":/data --entrypoint python3 scrydb`
   drops into an interpreter with `scrydb` importable.
 
-### Why source-only (no prebuilt wheels)
-
-`hamming.so`/`hamming.dylib` is a native shared library, and its ABI
-depends on the platform (and, in principle, the CPU architecture). Rather
-than maintain a wheel build matrix, this package ships as an sdist and
-compiles the extension for your exact machine during `pip install`
-(`setup.py`'s custom `build_py` step runs `cc`/`gcc`/`clang` against
-`src/scrydb/ext/hamming.c` and drops the result into `scrydb/ext/` as package
-data). This is the same approach used by many source-only Python
-packages that wrap native code without prebuilt wheels.
-
-If you want prebuilt wheels for CI/distribution, the natural next step is
-wiring this same build step into
-[`cibuildwheel`](https://cibuildwheel.pypa.io/), which runs it inside
-manylinux/macOS containers for each target platform and uploads the
-resulting wheels — that's outside the scope of this initial release.
-
 ## How extension discovery works at runtime
 
-`Index.open()`/`Index()` default to `hamming_ext_path="auto"`, which
-looks for `scrydb/ext/hamming.so` (Linux) or `scrydb/ext/hamming.dylib`
-(macOS) inside the installed package (`scrydb.core._bundled_hamming_path()`).
-Pass an explicit path to load a different build, or `None` to skip
-loading it entirely.
+`Index.open()`/`Index()` default to `vec_ext_path="auto"`, which loads
+`sqlite_vec.loadable_path()` — the copy of the extension bundled inside
+the installed `sqlite-vec` pip package, prebuilt for the current
+platform. Pass an explicit path to load a different build (e.g. a newer
+`vec0` release), or `None` to skip loading it entirely.
 
 ## Development / editable installs
 

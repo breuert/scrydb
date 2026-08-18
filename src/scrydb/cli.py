@@ -42,11 +42,14 @@ def _rerank_type(value: str):
     normalized = value.lower()
     if normalized in ("none", "false", ""):
         return False
-    if normalized in ("hamming", "cosine"):
+    if normalized in ("binary", "int8", "float", "hamming", "cosine"):
         return normalized
     if normalized == "true":
         return True
-    raise argparse.ArgumentTypeError(f"invalid rerank {value!r}; expected none, hamming, or cosine")
+    raise argparse.ArgumentTypeError(
+        f"invalid rerank {value!r}; expected none, binary, int8, float "
+        "(or the legacy aliases hamming/cosine)"
+    )
 
 
 def _result_to_dict(result: SearchResult) -> dict:
@@ -80,6 +83,7 @@ def cmd_index(args: argparse.Namespace) -> int:
                 id_field=args.doc_id_field or args.id_field,
                 text_field=args.text_field,
                 embedding_field=args.embedding_field,
+                store_int8_embeddings=args.store_int8,
             )
         if args.queries:
             print(f"scrydb: indexing queries from {args.queries} -> {args.db}", file=sys.stderr)
@@ -88,13 +92,16 @@ def cmd_index(args: argparse.Namespace) -> int:
                 id_field=args.query_id_field or args.id_field,
                 text_field=args.text_field,
                 embedding_field=args.embedding_field,
+                store_int8_embeddings=args.store_int8,
             )
     return 0
 
 
 def cmd_search(args: argparse.Namespace) -> int:
     with _open_index(args.db, args.model) as index:
-        results = index.search(args.query, mode=args.mode, top_k=args.top_k, rerank=args.rerank)
+        results = index.search(
+            args.query, mode=args.mode, top_k=args.top_k, rerank=args.rerank, precision=args.precision
+        )
         _print_results(results)
     return 0
 
@@ -111,10 +118,12 @@ def _run_batch_search(index: Index, args: argparse.Namespace):
         return None
     print(
         f"scrydb: batch-searching {len(index.queries)} stored queries "
-        f"(mode={args.mode!r}, rerank={args.rerank!r})",
+        f"(mode={args.mode!r}, precision={args.precision!r}, rerank={args.rerank!r})",
         file=sys.stderr,
     )
-    run = index.batch_search(mode=args.mode, top_k=args.top_k, rerank=args.rerank)
+    run = index.batch_search(
+        mode=args.mode, top_k=args.top_k, rerank=args.rerank, precision=args.precision
+    )
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     run.write_trec(out, tag=args.tag)
@@ -140,6 +149,7 @@ def cmd_auto(args: argparse.Namespace) -> int:
                 id_field=args.doc_id_field or args.id_field,
                 text_field=args.text_field,
                 embedding_field=args.embedding_field,
+                store_int8_embeddings=args.store_int8,
             )
         if queries:
             print(f"scrydb: indexing queries from {queries} -> {args.db}", file=sys.stderr)
@@ -148,10 +158,13 @@ def cmd_auto(args: argparse.Namespace) -> int:
                 id_field=args.query_id_field or args.id_field,
                 text_field=args.text_field,
                 embedding_field=args.embedding_field,
+                store_int8_embeddings=args.store_int8,
             )
 
         if args.query:
-            results = index.search(args.query, mode=args.mode, top_k=args.top_k, rerank=args.rerank)
+            results = index.search(
+                args.query, mode=args.mode, top_k=args.top_k, rerank=args.rerank, precision=args.precision
+            )
             _print_results(results)
             return 0
 
@@ -207,6 +220,11 @@ def _add_field_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--embedding-field", default=_env("SCRYDB_EMBEDDING_FIELD", "emb"), help="env: SCRYDB_EMBEDDING_FIELD"
     )
+    parser.add_argument(
+        "--store-int8", action="store_true", default=_env("SCRYDB_STORE_INT8", "") not in ("", "0", "false", "False"),
+        help="Also store int8-quantized embeddings, in addition to the always-stored binary "
+             "embeddings and (by default) full-precision embeddings (env: SCRYDB_STORE_INT8)",
+    )
 
 
 def _add_search_args(parser: argparse.ArgumentParser) -> None:
@@ -215,8 +233,14 @@ def _add_search_args(parser: argparse.ArgumentParser) -> None:
         help="env: SCRYDB_MODE (default: %(default)s)",
     )
     parser.add_argument(
+        "--precision", choices=["binary", "int8", "float"], default=_env("SCRYDB_PRECISION", "binary"),
+        help="Vector precision for mode=semantic/hybrid's semantic side "
+             "(env: SCRYDB_PRECISION, default: %(default)s)",
+    )
+    parser.add_argument(
         "--rerank", type=_rerank_type, default=_rerank_type(_env("SCRYDB_RERANK", "none")),
-        help="none, hamming, or cosine (env: SCRYDB_RERANK, default: none)",
+        help="none, binary, int8, or float (legacy aliases hamming/cosine also accepted) "
+             "(env: SCRYDB_RERANK, default: none)",
     )
     parser.add_argument(
         "--top-k", type=int, default=int(_env("SCRYDB_TOP_K", "10")), help="env: SCRYDB_TOP_K (default: %(default)s)"
