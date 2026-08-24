@@ -28,29 +28,36 @@ jobs:
           - { os: windows-latest, python: "3.11" }
           - { os: windows-latest, python: "3.13" }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      # Interpreters come from uv, not actions/setup-python: sqlite-vec needs a
+      # sqlite3 module built with loadable-extension support, and setup-python's
+      # macOS builds link against Apple's SQLite, which disables it. uv's
+      # managed CPython builds enable it on every platform.
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: ${{ matrix.python }}
+          enable-cache: true
 
       # Install the built package, not the source tree, so tests exercise
       # what users actually get from pip.
       - name: Install scrydb
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[eval,test]"
+          uv venv --python ${{ matrix.python }}
+          uv pip install ".[eval,test]"
 
       - name: Run tests
-        run: pytest -q
+        run: uv run --no-project pytest -q
 
   build:
     name: Build distributions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      # This job only packages the source, so it never loads the extension
+      # and does not need uv's interpreter.
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -60,7 +67,7 @@ jobs:
           python -m build
           twine check --strict dist/*
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
