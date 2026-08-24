@@ -14,6 +14,9 @@ jobs:
   test:
     name: ${{ matrix.os }} / py${{ matrix.python }}
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash # uniform quoting across the Windows/macOS/Linux runners
     strategy:
       fail-fast: false
       matrix:
@@ -30,24 +33,31 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Interpreters come from uv, not actions/setup-python: sqlite-vec needs a
-      # sqlite3 module built with loadable-extension support, and setup-python's
-      # macOS builds link against Apple's SQLite, which disables it. uv's
-      # managed CPython builds enable it on every platform.
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
 
-      # Install the built package, not the source tree, so tests exercise
-      # what users actually get from pip.
+      # sqlite-vec needs a sqlite3 module built with loadable-extension support.
+      # The runner images ship Pythons linked against SQLite builds that disable
+      # it (notably on macOS), and uv's default preference only *prefers*
+      # managed interpreters -- it will still pick one of those up. only-managed
+      # makes the choice deterministic.
       - name: Install scrydb
         run: |
-          uv venv --python ${{ matrix.python }}
+          uv python install "${{ matrix.python }}"
+          uv venv --python "${{ matrix.python }}" --python-preference only-managed
           uv pip install ".[eval,test]"
 
+      # Fail with one readable line instead of a wall of identical tracebacks if
+      # the interpreter still can't load extensions. --python .venv pins the
+      # environment explicitly so an ambient VIRTUAL_ENV cannot redirect it.
+      - name: Verify interpreter can load SQLite extensions
+        run: |
+          uv run --no-project --python .venv python -c "import sqlite3,sys; c=sqlite3.connect(':memory:'); print('python:', sys.executable); print('base:', sys.base_prefix); print('sqlite:', sqlite3.sqlite_version); sys.exit(0) if hasattr(c,'enable_load_extension') else sys.exit('FATAL: interpreter lacks enable_load_extension; sqlite-vec cannot load')"
+
       - name: Run tests
-        run: uv run --no-project pytest -q
+        run: uv run --no-project --python .venv pytest -q
 
   build:
     name: Build distributions
@@ -56,7 +66,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # This job only packages the source, so it never loads the extension
-      # and does not need uv's interpreter.
+      # and does not need a managed interpreter.
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
