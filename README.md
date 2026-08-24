@@ -91,14 +91,16 @@ plain, fast, wheel-only install.
 
 `Index.open()` loads the `sqlite-vec` extension automatically. This
 requires a Python build whose `sqlite3` module supports
-`enable_load_extension()` — true for the vast majority of Python
-installs (Homebrew/pyenv/python.org on macOS, virtually all Linux distro
-packages), but **not** macOS's system Python, which links against
-Apple's SQLite with extension loading disabled. If you hit a
-`RuntimeError` mentioning `enable_load_extension`, install Python via
-Homebrew (`brew install python`) or pyenv
-(`PYTHON_CONFIGURE_OPTS='--enable-loadable-sqlite-extensions' pyenv
-install <version>`) instead.
+`enable_load_extension()` — true for Homebrew, pyenv, and
+[uv](https://docs.astral.sh/uv/)-managed builds on macOS, virtually all
+Linux distro packages, and the official Windows builds, but **not** for
+macOS Pythons that link against Apple's SQLite, which disables extension
+loading. That includes macOS's system Python and the CPython that
+`actions/setup-python` installs on GitHub Actions runners. If you hit a
+`RuntimeError` mentioning `enable_load_extension`, switch to Python from
+Homebrew (`brew install python`), uv (`uv python install <version>`), or
+pyenv (`PYTHON_CONFIGURE_OPTS='--enable-loadable-sqlite-extensions'
+pyenv install <version>`).
 
 If you'd rather not load the extension at all, you can still install and
 use scrydb for lexical (BM25) search only — just disable it explicitly:
