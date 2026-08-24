@@ -1,0 +1,9 @@
+version: 2
+updates:
+  # Keep the pinned action versions in .github/workflows fresh.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
