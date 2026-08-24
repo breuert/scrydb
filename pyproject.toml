@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "scrydb"
 version = "0.2.0"
-description = "Lexical, semantic, and hybrid search built on SQLite, with vector search powered by sqlite-vec."
+description = "Lexical, semantic, and hybrid search built on SQLite."
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
