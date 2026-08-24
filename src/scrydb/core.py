@@ -1241,11 +1241,13 @@ class Index:
         except AttributeError as exc:
             raise RuntimeError(
                 "This Python build's sqlite3 module does not support loading extensions "
-                "(enable_load_extension is missing). On macOS, the system Python is usually "
-                "built against Apple's SQLite, which disables extension loading. Install "
-                "Python via Homebrew (`brew install python`) or via pyenv with "
+                "(enable_load_extension is missing). This usually means a macOS Python "
+                "linked against Apple's SQLite, which disables extension loading -- the "
+                "system Python and the CPython installed by actions/setup-python both are. "
+                "Install Python via Homebrew (`brew install python`), uv (`uv python install "
+                "<version>`), or pyenv with "
                 "`PYTHON_CONFIGURE_OPTS='--enable-loadable-sqlite-extensions' pyenv install "
-                "<version>`, which links against a SQLite that allows it."
+                "<version>`, which link against a SQLite that allows it."
             ) from exc
         try:
             self.conn.load_extension(ext_path)
