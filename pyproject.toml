@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,14 +8,14 @@ version = "0.2.0"
 description = "Lexical, semantic, and hybrid search built on SQLite, with vector search powered by sqlite-vec."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Timo Breuer", email = "timobreuer@acm.org" },
 ]
 keywords = ["sqlite", "fts5", "sqlite-vec", "information-retrieval", "search", "embeddings", "vector-search"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
     "Operating System :: Microsoft :: Windows",
@@ -31,13 +31,19 @@ dependencies = [
 [project.optional-dependencies]
 dense = ["sentence-transformers>=3.0"]
 eval = ["pandas>=1.5"]
+test = ["pytest>=7"]
 all = ["sentence-transformers>=3.0", "pandas>=1.5"]
 
 [project.urls]
 Homepage = "https://breuert.github.io/scrydb"
+Repository = "https://github.com/breuert/scrydb"
+Issues = "https://github.com/breuert/scrydb/issues"
 
 [project.scripts]
 scrydb = "scrydb.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
