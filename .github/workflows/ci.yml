@@ -34,7 +34,7 @@ jobs:
       # sqlite3 module built with loadable-extension support, and setup-python's
       # macOS builds link against Apple's SQLite, which disables it. uv's
       # managed CPython builds enable it on every platform.
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
