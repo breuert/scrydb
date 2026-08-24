@@ -35,7 +35,7 @@ test = ["pytest>=7"]
 all = ["sentence-transformers>=3.0", "pandas>=1.5"]
 
 [project.urls]
-Homepage = "https://breuert.github.io/scrydb"
+Homepage = "https://github.com/breuert/scrydb"
 Repository = "https://github.com/breuert/scrydb"
 Issues = "https://github.com/breuert/scrydb/issues"
 
