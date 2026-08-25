@@ -11,6 +11,9 @@
 
 The library is compatible with [Sentence Transformers](https://www.sbert.net/index.html). However, it is also possible to store precomputed embeddings for both queries and documents.
 
+> [!NOTE]  
+> The evaluation protocol, benchmark results, and examples are available at [`scrydb-eval`](https://github.com/breuert/scrydb-eval/), the corresponding data is shared on [Hugging Face](https://huggingface.co/datasets/breuert/scrydb-eval).
+
 ## Usage examples
 
 ``scrydb`` can be used interactively as follows:
