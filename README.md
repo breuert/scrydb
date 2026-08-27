@@ -12,7 +12,7 @@
 The library is compatible with [Sentence Transformers](https://www.sbert.net/index.html). However, it is also possible to store precomputed embeddings for both queries and documents.
 
 > [!NOTE]  
-> The evaluation protocol, benchmark results, and examples are available at [`scrydb-eval`](https://github.com/breuert/scrydb-eval/), the corresponding data is shared on [Hugging Face](https://huggingface.co/datasets/breuert/scrydb-eval).
+> The evaluation protocol, benchmark results, and examples are available at [`scrydb-eval`](https://github.com/breuert/scrydb-eval/), the corresponding resources are shared on [Hugging Face](https://huggingface.co/datasets/breuert/scrydb-eval). A preprint paper with more details is available at <https://arxiv.org/abs/2608.24060>. 
 
 ## Usage examples
 
@@ -225,3 +225,18 @@ step — any command after it (`uv run pytest`, `uv run python -m scrydb.cli --h
 - `pip install "scrydb[dense]"` / `uv pip install "scrydb[dense]"` — dense/hybrid search via `sentence-transformers`
 - `pip install "scrydb[eval]"` / `uv pip install "scrydb[eval]"` — `Run.to_dataframe()` via `pandas`
 - `pip install "scrydb[all]"` / `uv pip install "scrydb[all]"` — both
+
+
+## Citation
+
+```
+@misc{scrydb2026,
+      title={SQLite is Enough. Lexical, Semantic, and Hybrid Search with scrydb}, 
+      author={Timo Breuer},
+      year={2026},
+      eprint={2608.24060},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2608.24060}
+}
+```
